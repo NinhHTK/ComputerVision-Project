@@ -1,3 +1,8 @@
+# Liên hệ để lấy dataset
+
+
+
+
 # Phát hiện buồn ngủ khi lái xe — CPV301
 
 Phát hiện dấu hiệu buồn ngủ của tài xế qua webcam bằng 3 đặc trưng hình học:
