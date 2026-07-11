@@ -19,14 +19,13 @@ LƯU Ý PHƯƠNG PHÁP (ghi rõ trong báo cáo):
     và tỷ lệ loại này được BÁO CÁO (không giấu, không bịa).
 
 Cách chạy (demo):
-    python evaluate.py --ddd ../dataset/driver_drowsiness_dataset --limit 500
-    python evaluate.py --video ../dataset/video
+    py evaluate.py --ddd ../dataset/driver_drowsiness_dataset --limit 500
     
 Cách chạy:
-    python evaluate.py --ddd    ../dataset/driver_drowsiness_dataset
-    python evaluate.py --yawn   ../dataset/yawn_eye_dataset_new
-    python evaluate.py --video  ../dataset/video
-    python evaluate.py --all    ../dataset          # chạy tất cả nguồn có sẵn
+    py evaluate.py --ddd    ../dataset/driver_drowsiness_dataset
+    py evaluate.py --yawn   ../dataset/yawn_eye_dataset_new
+    py evaluate.py --video  ../dataset/video
+    py evaluate.py --all    ../dataset          # chạy tất cả nguồn có sẵn
 
 Kết quả: in ra màn hình + lưu CSV trong thư mục ./results/
 ===================================================================
