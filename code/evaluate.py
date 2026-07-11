@@ -19,7 +19,8 @@ LƯU Ý PHƯƠNG PHÁP (ghi rõ trong báo cáo):
     và tỷ lệ loại này được BÁO CÁO (không giấu, không bịa).
 
 Cách chạy (demo):
-    python evaluate.py --ddd ..\dataset\driver_drowsiness_dataset --limit 500
+    python evaluate.py --ddd ../dataset/driver_drowsiness_dataset --limit 500
+    python evaluate.py --video ../dataset/video
     
 Cách chạy:
     python evaluate.py --ddd    ../dataset/driver_drowsiness_dataset
@@ -45,14 +46,33 @@ from collections import defaultdict
 # 1. NGƯỠNG - DÙNG CHUNG VỚI drowsiness_detection.py
 #    (giữ nguyên để kết quả đánh giá khớp với hệ thống demo)
 # ==================================================================
-EAR_THRESHOLD = 0.21
-EAR_CONSEC_FRAMES = 20
+# --- Ngưỡng giá trị (không phụ thuộc fps) ---
+EAR_THRESHOLD = 0.21        # EAR < ngưỡng => mắt nhắm
+MAR_THRESHOLD = 0.6         # MAR > ngưỡng => miệng mở (ngáp)
+TILT_THRESHOLD = 15         # tilt > ngưỡng => nghiêng đầu
 
-MAR_THRESHOLD = 0.6
-MAR_CONSEC_FRAMES = 15
+# --- Ngưỡng "số frame liên tiếp" GỐC, định nghĩa ở 30 fps ---
+# (giữ đúng giá trị trong drowsiness_detection.py để làm tham chiếu)
+REFERENCE_FPS = 30.0
+EAR_CONSEC_FRAMES = 20      # 20 frame @30fps  ~= 0.67 giây
+MAR_CONSEC_FRAMES = 15      # 15 frame @30fps  ~= 0.50 giây
+TILT_CONSEC_FRAMES = 20     # 20 frame @30fps  ~= 0.67 giây
 
-TILT_THRESHOLD = 15
-TILT_CONSEC_FRAMES = 20
+# --- Quy đổi các ngưỡng trên sang GIÂY (nguồn sự thật khi chuẩn hóa) ---
+# Nhờ đó, dù video quay ở fps nào, "khoảng thời gian" cần thiết để kích
+# hoạt cảnh báo vẫn giữ nguyên tính bằng giây, không bị lệch theo fps.
+EAR_CONSEC_SECONDS  = EAR_CONSEC_FRAMES  / REFERENCE_FPS   # ~0.667s
+MAR_CONSEC_SECONDS  = MAR_CONSEC_FRAMES  / REFERENCE_FPS   # ~0.500s
+TILT_CONSEC_SECONDS = TILT_CONSEC_FRAMES / REFERENCE_FPS   # ~0.667s
+
+
+def frames_for_seconds(seconds, fps):
+    """
+    Quy đổi 'seconds' giây sang số frame liên tiếp tương ứng với fps thực tế.
+    Tối thiểu 1 frame để tránh ngưỡng = 0 khi fps rất thấp.
+    """
+    n = int(round(seconds * fps))
+    return max(1, n)
 
 # ==================================================================
 # 2. CHỈ SỐ LANDMARK (giống code gốc)
@@ -424,6 +444,19 @@ def run_system_on_video(video_path):
     if not fps or fps <= 0:
         fps = 30.0  # fallback nếu không đọc được
 
+    # --- CHUẨN HÓA NGƯỠNG THEO FPS THỰC TẾ ---
+    # Thay vì dùng số frame cố định (thiết kế cho 30fps), ta quy đổi
+    # khoảng thời gian (giây) sang số frame theo fps của CHÍNH video này.
+    # Nhờ vậy video 16fps hay 30fps đều yêu cầu cùng MỘT khoảng thời gian
+    # (vd ~0.67s cho mắt) mới kích hoạt cảnh báo -> kết quả nhất quán.
+    ear_frames  = frames_for_seconds(EAR_CONSEC_SECONDS,  fps)
+    mar_frames  = frames_for_seconds(MAR_CONSEC_SECONDS,  fps)
+    tilt_frames = frames_for_seconds(TILT_CONSEC_SECONDS, fps)
+    print(f"      Ngưỡng theo fps={fps:.1f}: "
+          f"eye>={ear_frames}f ({EAR_CONSEC_SECONDS:.2f}s) | "
+          f"yawn>={mar_frames}f ({MAR_CONSEC_SECONDS:.2f}s) | "
+          f"tilt>={tilt_frames}f ({TILT_CONSEC_SECONDS:.2f}s)")
+
     # dùng static=False để tận dụng tracking giữa frame (giống demo realtime)
     face_mesh = make_face_mesh(static=False)
 
@@ -455,7 +488,7 @@ def run_system_on_video(video_path):
         # ---- Mắt ----
         if metrics["ear"] < EAR_THRESHOLD:
             eye_counter += 1
-            if eye_counter >= EAR_CONSEC_FRAMES:
+            if eye_counter >= ear_frames:
                 active["eye_closed"] = True
         else:
             eye_counter = 0
@@ -463,7 +496,7 @@ def run_system_on_video(video_path):
         # ---- Ngáp ----
         if metrics["mar"] > MAR_THRESHOLD:
             mouth_counter += 1
-            if mouth_counter >= MAR_CONSEC_FRAMES:
+            if mouth_counter >= mar_frames:
                 active["yawn"] = True
         else:
             mouth_counter = 0
@@ -471,7 +504,7 @@ def run_system_on_video(video_path):
         # ---- Nghiêng đầu ----
         if metrics["tilt"] > TILT_THRESHOLD:
             tilt_counter += 1
-            if tilt_counter >= TILT_CONSEC_FRAMES:
+            if tilt_counter >= tilt_frames:
                 active["head_tilt"] = True
         else:
             tilt_counter = 0
