@@ -1,0 +1,2 @@
+source,TP,TN,FP,FN,accuracy,precision,recall,f1,processed,no_face,no_face_rate_percent,seconds
+yawn_eye(MAR),522,724,0,200,0.8616874135546335,1.0,0.7229916897506925,0.8392282958199356,1446,2,0.14,11.7

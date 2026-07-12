@@ -641,9 +641,10 @@ def evaluate_video(video_dir, overlap_ratio=0.3):
     """
     print("\n########## ĐÁNH GIÁ VIDEO (theo thời gian) ##########")
 
-    video_files = []
+    video_files = set()
     for ext in ("*.mp4", "*.MP4", "*.avi", "*.mov"):
-        video_files.extend(glob.glob(os.path.join(video_dir, ext)))
+        video_files.update(glob.glob(os.path.join(video_dir, ext)))
+    video_files = sorted(video_files)
 
     if not video_files:
         print(f"  [THÔNG BÁO] Chưa có video nào trong {video_dir}.")
