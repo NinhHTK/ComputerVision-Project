@@ -53,7 +53,7 @@ TILT_THRESHOLD = 15         # tilt > ngưỡng => nghiêng đầu
 # --- Ngưỡng "số frame liên tiếp" GỐC, định nghĩa ở 30 fps ---
 # (giữ đúng giá trị trong drowsiness_detection.py để làm tham chiếu)
 REFERENCE_FPS = 30.0
-EAR_CONSEC_FRAMES = 20      # 20 frame @30fps  ~= 0.67 giây
+EAR_CONSEC_FRAMES = 30      # 20 frame @30fps  ~= 0.67 giây
 MAR_CONSEC_FRAMES = 15      # 15 frame @30fps  ~= 0.50 giây
 TILT_CONSEC_FRAMES = 20     # 20 frame @30fps  ~= 0.67 giây
 
