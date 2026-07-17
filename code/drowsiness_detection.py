@@ -22,7 +22,7 @@ import time
 # 1. CẤU HÌNH NGƯỠNG (tinh chỉnh lại cho phù hợp khuôn mặt của bạn)
 # ------------------------------------------------------------------
 EAR_THRESHOLD = 0.21        # EAR nhỏ hơn ngưỡng này => coi như mắt đang nhắm
-EAR_CONSEC_FRAMES = 20      # Số frame liên tiếp mắt nhắm mới báo "ngủ gật"
+EAR_CONSEC_FRAMES = 30      # Số frame liên tiếp mắt nhắm mới báo "ngủ gật"
 
 MAR_THRESHOLD = 0.6         # MAR lớn hơn ngưỡng này => coi như miệng đang mở (ngáp)
 MAR_CONSEC_FRAMES = 15      # Số frame liên tiếp mở miệng mới tính là 1 lần ngáp
