@@ -1,120 +1,208 @@
-# Phát hiện buồn ngủ khi lái xe — CPV301
+# Driver Drowsiness Detection — CPV301
 
-Phát hiện dấu hiệu buồn ngủ của tài xế qua webcam bằng 3 đặc trưng hình học:
-- **EAR** (Eye Aspect Ratio): mắt nhắm lâu → ngủ gật
-- **MAR** (Mouth Aspect Ratio): miệng mở lâu → ngáp
-- **Head Tilt**: đầu nghiêng quá mức (roll — nghiêng trái/phải)
+Đồ án Computer Vision phát hiện ba dấu hiệu liên quan đến buồn ngủ của tài xế
+qua webcam hoặc video:
 
-Không dùng deep learning tự train. MediaPipe Face Mesh chỉ là công cụ tìm landmark có sẵn; toàn bộ logic phán đoán là hình học thuần (explainable).
+- **Eye closure:** Eye Aspect Ratio (EAR) thấp trong một khoảng thời gian.
+- **Yawn:** Mouth Aspect Ratio (MAR) cao trong một khoảng thời gian.
+- **Head tilt:** góc nối hai khóe mắt vượt ngưỡng nghiêng trái/phải.
 
-> **Lưu ý về head tilt:** Hiện tại chỉ đo **roll** (nghiêng trái–phải), chưa đo **pitch** (gục đầu ra trước). Đây là hạn chế đã biết, ghi rõ trong báo cáo.
+MediaPipe Face Mesh được dùng để trích xuất landmark. Phần quyết định cảnh báo
+dựa trên các đặc trưng hình học và quy tắc thời gian, không huấn luyện mô hình
+deep learning mới.
 
----
+## 1. Môi trường đã kiểm thử
 
-## ⚠️ Hai lỗi thường gặp — đọc trước khi cài
+- Windows 10/11
+- Python `3.11.9`
+- OpenCV `4.11.0`
+- MediaPipe `0.10.21`
+- NumPy `1.26.4`
 
-1. **Phiên bản Python:** MediaPipe (bản dùng ở đây, `0.10.21`) **chưa hỗ trợ Python 3.12+**. Máy cài Python 3.14 sẽ không có bản build phù hợp. Bắt buộc dùng **Python 3.11** (đã test với 3.11.9).
+Project không kèm môi trường Python. Tất cả dependency trực tiếp được khai báo
+trong `code/requirements.txt`.
 
-2. **Đường dẫn KHÔNG được chứa dấu tiếng Việt.** Nếu thư mục project nằm trong đường dẫn có dấu (ví dụ `Kì 4`), MediaPipe báo lỗi `FileNotFoundError: binarypb`. Đây là bug đã biết trong lõi C++ của MediaPipe. Đổi tên thành không dấu (ví dụ `Ki4`) để khắc phục.
+> Nên đặt project trong đường dẫn không có dấu tiếng Việt. Nếu MediaPipe báo
+> `FileNotFoundError` liên quan đến `binarypb`, hãy chuyển project sang đường
+> dẫn không dấu, chẳng hạn `D:\CPV301\ComputerVision-Project`.
 
----
+## 2. Cài đặt trên Windows
 
-## Cài đặt
-
-Yêu cầu **Python 3.11** (xem lý do ở phần cảnh báo trên).
-
-Tạo môi trường ảo riêng bằng Python 3.11, rồi cài thư viện (nhớ add Python.exe to PATH):
+Mở PowerShell tại thư mục gốc của project:
 
 ```powershell
-# Windows (PowerShell) — trỏ đúng tới Python 3.11
 py -3.11 -m venv venv311
 .\venv311\Scripts\Activate.ps1
-
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r .\code\requirements.txt
 ```
 
-```bash
-# macOS / Linux
-python3.11 -m venv venv311
-source venv311/bin/activate
-
-pip install -r requirements.txt
-```
-
-Khi môi trường được kích hoạt, đầu dòng lệnh phải hiển thị `(venv311)`. **Luôn kích hoạt `venv311` trước khi chạy bất kỳ file Python nào.**
-
-Phiên bản MediaPipe sử dụng: `mediapipe==0.10.21`.
-
----
-
-## Chạy phát hiện realtime
-
-```bash
-python drowsiness_detection.py
-```
-
-Nhấn **Q** để thoát. Webcam mặc định là camera số 0.
-
-Màn hình hiển thị realtime các chỉ số EAR / MAR / Tilt và bật cảnh báo (chữ đỏ) khi phát hiện dấu hiệu buồn ngủ.
-
----
-
-## Chạy đánh giá (`evaluate.py`)
-
-Script đánh giá tổng hợp trên các dataset ảnh tĩnh và video, tự chuẩn hóa `consec_frames` theo fps thực tế của video. Kết quả xuất ra thư mục `results/` (CSV) và in ra màn hình.
-
-Kích hoạt `venv311` trước, sau đó:
+Kiểm tra dependency:
 
 ```powershell
-# Test nhanh trên DDD (~3–5 phút) trước khi chạy full
-python evaluate.py --ddd ..\dataset\driver_drowsiness_dataset --limit 500
-
-# Đánh giá riêng chỉ số MAR trên yawn_eye (vài phút)
-python evaluate.py --yawn ..\dataset\yawn_eye_dataset_new
-
-# Chạy full DDD sau khi đã chắc --limit 500 chạy ổn (~20–40 phút)
-python evaluate.py --ddd ..\dataset\driver_drowsiness_dataset
+python -m pip check
+python -c "import cv2, mediapipe, numpy; print(cv2.__version__, mediapipe.__version__, numpy.__version__)"
 ```
 
-Điều chỉnh đường dẫn `--ddd` / `--yawn` cho khớp với vị trí đặt dataset trên máy bạn.
+Kết quả `pip check` mong đợi là `No broken requirements found.`
 
----
+Nếu PowerShell chặn script kích hoạt môi trường, có thể gọi trực tiếp:
 
-## Tải dataset
-
-Dataset **không được commit lên Git** (đã loại trong `.gitignore`), nên cần tải thủ công từ Kaggle và đặt vào thư mục `dataset/`:
-
-- **DDD (Driver Drowsiness Dataset)** — 41.793 ảnh (22.348 drowsy + 19.445 non_drowsy), dùng đánh giá toàn hệ thống:
-  https://www.kaggle.com/datasets/ismailnasri20/driver-drowsiness-dataset-ddd
-
-- **yawn_eye_dataset_new** — dùng phần `yawn/no_yawn` để đánh giá riêng chỉ số MAR:
-  https://www.kaggle.com/datasets/serenaraju/yawn-eye-dataset-new
-
-Cấu trúc thư mục `dataset/` gợi ý:
-
+```powershell
+.\venv311\Scripts\python.exe -m pip install -r .\code\requirements.txt
 ```
+
+## 3. Chạy ứng dụng realtime
+
+Từ thư mục gốc của project:
+
+```powershell
+python .\code\drowsiness_detection.py
+```
+
+Ứng dụng sử dụng webcam số `0`. Nhấn **Q** để thoát.
+
+Các ngưỡng mặc định:
+
+| Dấu hiệu | Ngưỡng hình học | Thời gian liên tục |
+|---|---:|---:|
+| Eye closure | EAR < 0.21 | 1.00 giây |
+| Yawn | MAR > 0.60 | 0.50 giây |
+| Head tilt | góc > 15° | 0.67 giây |
+
+Ngưỡng được định nghĩa tập trung trong `code/config.py`. Demo realtime và video
+evaluation cùng sử dụng `code/temporal_logic.py`, vì vậy thời gian cảnh báo không
+phụ thuộc trực tiếp vào FPS của camera/video.
+
+## 4. Dữ liệu đi kèm bài nộp
+
+`dataset/samples/` chứa bộ mẫu có thể chạy ngay:
+
+- DDD: 50 ảnh `drowsy` và 50 ảnh `non_drowsy`.
+- yawn_eye: 50 ảnh cho mỗi lớp `yawn`/`no_yawn` trên mỗi split
+  `train`/`test` (tổng 200 ảnh).
+- `sample_manifest.csv`: đường dẫn tương đối và SHA-256 của 300 ảnh mẫu.
+
+`dataset/video_submission/` chứa sáu video đã nén của ba thành viên và sáu file
+nhãn cùng tên. CSV nhãn có cấu trúc:
+
+```csv
+start,end,event
+3.0,6.0,eye_closed
+```
+
+`event` chỉ nhận một trong ba giá trị: `eye_closed`, `yawn`, `head_tilt`.
+
+### Dataset đầy đủ
+
+Dataset đầy đủ không nằm trong bài nộp vì giới hạn dung lượng. Có thể tải tại:
+
+- [Driver Drowsiness Dataset (DDD)](https://www.kaggle.com/datasets/ismailnasri20/driver-drowsiness-dataset-ddd)
+- [Yawn Eye Dataset New](https://www.kaggle.com/datasets/serenaraju/yawn-eye-dataset-new)
+
+Sau khi tải và giải nén, đặt theo cấu trúc:
+
+```text
 dataset/
 ├── driver_drowsiness_dataset/
+│   ├── drowsy/
+│   └── non_drowsy/
 └── yawn_eye_dataset_new/
+    ├── train/
+    │   ├── yawn/
+    │   └── no_yawn/
+    └── test/
+        ├── yawn/
+        └── no_yawn/
 ```
 
----
+## 5. Chạy đánh giá
 
-## Tinh chỉnh ngưỡng
+Mọi lệnh dưới đây được chạy từ thư mục gốc của project. `--output-dir` quyết
+định nơi lưu CSV và giúp tránh ghi đè kết quả đã báo cáo.
 
-Mỗi khuôn mặt/camera khác nhau, nên chỉnh các hằng số ở đầu file cho đúng:
-- `EAR_THRESHOLD` (mặc định 0.21): nếu báo ngủ gật quá nhạy thì giảm; nếu không bắt được thì tăng. Quan sát giá trị EAR in trên màn hình khi mắt mở/nhắm để chọn ngưỡng giữa hai mức.
-- `MAR_THRESHOLD` (0.6): tương tự với ngáp.
-- `TILT_THRESHOLD` (15 độ): góc nghiêng đầu cho phép.
-- Các `*_CONSEC_FRAMES`: tăng lên nếu muốn giảm cảnh báo giả (yêu cầu dấu hiệu kéo dài hơn).
+### Smoke test trên 300 ảnh mẫu
 
----
+```powershell
+python .\code\evaluate.py --ddd .\dataset\samples\DDD --output-dir .\run_results\ddd_sample
+python .\code\evaluate.py --yawn .\dataset\samples\yawn_eye --output-dir .\run_results\yawn_sample
+```
 
-## Cấu trúc project
+Kết quả kiểm tra tham chiếu:
 
-- `drowsiness_detection.py` — chương trình chính (phát hiện realtime từ webcam)
-- `evaluate.py` — script đánh giá tổng hợp (DDD + yawn_eye + video tự quay)
-- `requirements.txt` — thư viện cần cài
-- `.gitignore` — loại `venv311/`, `dataset/`, `results/`, cache Python khỏi repo
-- `dataset/` — chứa DDD + yawn_eye (tải thủ công, bị gitignore)
-- `results/` — kết quả đánh giá dạng CSV
+| Nguồn | Processed | No face | Accuracy | F1 |
+|---|---:|---:|---:|---:|
+| DDD sample | 100 | 0 | 0.7300 | 0.6494 |
+| yawn_eye sample | 199 | 1 | 0.8442 | 0.8166 |
+
+### Video tự quay
+
+```powershell
+python .\code\evaluate.py --video .\dataset\video_submission --output-dir .\run_results\video
+```
+
+Video evaluation xuất kết quả frame-level, event-level, theo từng thành viên,
+theo từng file và một CSV lưu cấu hình chạy.
+
+### Dataset đầy đủ
+
+```powershell
+# Kiểm tra nhanh: tối đa 500 ảnh cho mỗi lớp DDD
+python .\code\evaluate.py --ddd .\dataset\driver_drowsiness_dataset --limit 500 --output-dir .\run_results\ddd_quick
+
+# Đánh giá toàn bộ hai dataset ảnh tĩnh
+python .\code\evaluate.py --ddd .\dataset\driver_drowsiness_dataset --output-dir .\run_results\ddd_full
+python .\code\evaluate.py --yawn .\dataset\yawn_eye_dataset_new --output-dir .\run_results\yawn_full
+
+# Chạy mọi nguồn dữ liệu đang có trong dataset/
+python .\code\evaluate.py --all .\dataset --output-dir .\run_results\all
+```
+
+Ảnh không phát hiện được khuôn mặt được báo cáo riêng và không được đưa vào
+confusion matrix. Với ảnh tĩnh, mỗi ảnh được so sánh trực tiếp với ngưỡng; quy
+tắc duy trì theo thời gian chỉ áp dụng cho realtime và video.
+
+## 6. Kết quả có sẵn
+
+`code/results/` được chia thành:
+
+- `full/static/`: kết quả trên dataset ảnh tĩnh đầy đủ.
+- `sample_smoke_test/`: kết quả kiểm tra pipeline bằng 300 ảnh mẫu.
+- `experiments/`: quick test và các thử nghiệm lựa chọn ngưỡng.
+- `final_video/`: kết quả video cuối sau khi sửa logic thời gian, gồm kết quả
+  tổng hợp, theo thành viên, theo file và cấu hình chạy.
+
+Xem mô tả chi tiết tại `code/results/README.md`.
+
+## 7. Cấu trúc project
+
+```text
+ComputerVision-Project-main/
+├── README.md
+├── .gitignore
+├── code/
+│   ├── config.py
+│   ├── temporal_logic.py
+│   ├── drowsiness_detection.py
+│   ├── evaluate.py
+│   ├── prepare_submission_samples.py
+│   ├── requirements.txt
+│   └── results/
+└── dataset/
+    ├── samples/
+    └── video_submission/
+```
+
+Các môi trường `.venv/`, `venv311/`, full dataset, video gốc và cache Python
+không được đưa vào gói nộp.
+
+## 8. Hạn chế đã biết
+
+- Head tilt hiện chỉ ước lượng **roll** từ đường nối hai khóe mắt; chuyển động
+  cúi đầu ra trước (**pitch**) có thể không được phát hiện.
+- Ba thành viên quay video với FPS, độ phân giải, góc quay và quy trình ghi nhãn
+  khác nhau. Vì vậy kết quả theo từng thành viên là phân tích chính; kết quả gộp
+  cần được diễn giải thận trọng.
+- Hệ thống dùng ngưỡng hình học cố định nên khả năng khái quát sang khuôn mặt,
+  camera và điều kiện chiếu sáng mới còn hạn chế.
+

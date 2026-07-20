@@ -6,6 +6,9 @@
 /.venv
 /venv
 
+__pycache__/
+*.py[cod]
+
 /code/results/archive_video_before_timing_fix
 /code/results/archive_invalid_duplicate_video_mar
-/code/__pycache__
+/run_results

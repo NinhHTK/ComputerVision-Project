@@ -1,11 +1,8 @@
+"""Tạo bộ ảnh mẫu tái lập cho gói submission.
+
+Chạy từ thư mục gốc project:
+python code/prepare_submission_samples.py --ddd dataset/driver_drowsiness_dataset --yawn dataset/yawn_eye_dataset_new --output dataset/samples --count 50 --seed 42
 """
-cd code
-python prepare_submission_samples.py --ddd "..\dataset\driver_drowsiness_dataset" --yawn "..\dataset\yawn_eye_dataset_new" --output "..\dataset\samples" --count 50 --seed 42
-"""
-
-
-
-
 
 import argparse
 import csv

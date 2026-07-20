@@ -1,38 +1,40 @@
 # Results Directory
 
-## full/static
+## `full/static/`
 
-Full external-dataset results reported in the paper.
+Kết quả trên toàn bộ dataset ảnh tĩnh dùng trong báo cáo:
 
-- `ddd_full.csv`: complete DDD evaluation.
-- `yawn_full_mar060.csv`: complete yawn_eye evaluation with MAR=0.60.
+- `ddd_full.csv`: đánh giá toàn hệ thống trên DDD.
+- `yawn_full_mar060.csv`: đánh giá riêng MAR trên yawn_eye với ngưỡng 0.60.
 
-## sample_smoke_test
+## `sample_smoke_test/`
 
-Results produced from the 300 bundled sample images. These results are
-only for pipeline verification and are not the full-dataset results.
+Kết quả trên 300 ảnh mẫu đi kèm bài nộp. Các file này chỉ dùng xác minh pipeline,
+không thay thế kết quả full dataset.
 
-## experiments/ddd_quick_test.csv
+## `experiments/`
 
-A quick test using at most 500 images per DDD class. This test is not
-used as the primary reported result.
+- `ddd_quick_test.csv`: quick test với tối đa 500 ảnh mỗi lớp DDD.
+- `ear_threshold_sweep/`: thử nghiệm EAR và thời gian trên video của Bình dùng
+  trong giai đoạn lựa chọn cấu hình.
+- `mar_threshold_sweep/static/`: thử nghiệm ngưỡng MAR trên full yawn_eye.
 
-## experiments/ear_threshold_sweep
+## `final_video/`
 
-Single-subject EAR threshold and temporal-duration experiments conducted
-using Bình's videos.
+Kết quả video cuối sau khi chuyển logic cảnh báo sang thời gian:
 
-## experiments/mar_threshold_sweep/static
+- `video_frame_level.csv`: frame-level tổng hợp.
+- `video_event_level.csv`: event-level tổng hợp.
+- `video_frame_level_per_subject.csv`: frame-level theo thành viên.
+- `video_event_level_per_subject.csv`: event-level theo thành viên.
+- `video_per_file.csv`: FPS, số frame và tỷ lệ mất mặt của từng video.
+- `video_run_config.csv`: ngưỡng, thời gian duy trì và event overlap của lần chạy.
 
-MAR threshold experiments on the complete yawn_eye dataset.
+Kết quả theo thành viên là phân tích chính vì giao thức quay của ba thành viên
+không đồng nhất. Chỉ số tổng hợp được dùng như thông tin bổ sung.
 
-## final_video
+## Kết quả lưu trữ cục bộ
 
-Reserved for final per-subject video results generated after correcting
-the timing logic.
+Kết quả trước khi sửa timing và kết quả có input video trùng lặp được giữ cục bộ
+để audit nhưng không nằm trong kết quả cuối hoặc gói submission.
 
-## Archived results
-
-Results generated before the timing correction or from accidentally
-duplicated video inputs are retained locally for audit purposes but are
-not included as final results.
