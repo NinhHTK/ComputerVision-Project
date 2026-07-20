@@ -3,3 +3,9 @@
 /dataset/yawn_eye_dataset_new
 
 /venv311
+/.venv
+/venv
+
+/code/results/archive_video_before_timing_fix
+/code/results/archive_invalid_duplicate_video_mar
+/code/__pycache__

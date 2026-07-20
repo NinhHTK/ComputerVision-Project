@@ -1,0 +1,12 @@
+start,end,event
+3.0,7.0,eye_closed
+12.0,17.0,eye_closed
+20.0,24.0,yawn
+35.0,40.0,yawn
+43.0,48.0,eye_closed
+45.0,49.0,head_tilt
+53.0,59.0,eye_closed
+55.0,60.0,head_tilt
+64.0,69.0,yawn
+73.0,80.0,eye_closed
+76.0,80.0,head_tilt

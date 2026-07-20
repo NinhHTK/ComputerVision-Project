@@ -1,0 +1,10 @@
+subject,level,event_type,true_events,hit,miss,false_alarm,recall,precision
+Binh,event,eye_closed,5,5,0,6,1.0,0.45454545454545453
+Binh,event,yawn,3,3,0,0,1.0,1.0
+Binh,event,head_tilt,3,0,3,0,0.0,
+Kiet,event,eye_closed,4,2,2,3,0.5,0.4
+Kiet,event,yawn,2,0,2,1,0.0,0.0
+Kiet,event,head_tilt,3,3,0,3,1.0,0.5
+Ninh,event,eye_closed,1,1,0,1,1.0,0.5
+Ninh,event,yawn,0,0,0,0,,
+Ninh,event,head_tilt,0,0,0,0,,

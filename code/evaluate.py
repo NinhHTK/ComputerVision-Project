@@ -13,8 +13,8 @@ trên 3 nguồn dữ liệu:
 LƯU Ý PHƯƠNG PHÁP (ghi rõ trong báo cáo):
   - Với ẢNH TĨNH: KHÔNG có khái niệm "N frame liên tiếp".
     Ta chỉ so sánh giá trị EAR/MAR/tilt trên từng ảnh với ngưỡng.
-  - Với VIDEO: giữ logic đếm frame liên tiếp GIỐNG HỆT code realtime
-    (drowsiness_detection.py) để phản ánh đúng hành vi thật của hệ thống.
+  - Với VIDEO: dùng cùng ngưỡng theo GIÂY và cùng DurationTracker với code
+    realtime để kết quả không phụ thuộc FPS của nguồn video.
   - Ảnh mà MediaPipe KHÔNG tìm được mặt sẽ bị LOẠI khỏi phần tính toán,
     và tỷ lệ loại này được BÁO CÁO (không giấu, không bịa).
 
@@ -24,10 +24,10 @@ Cách chạy (demo):
 Cách chạy:
     py evaluate.py --ddd    ../dataset/driver_drowsiness_dataset
     py evaluate.py --yawn   ../dataset/yawn_eye_dataset_new
-    py evaluate.py --video  ../dataset/video
+    py evaluate.py --video  ../dataset/video_submission
     py evaluate.py --all    ../dataset          # chạy tất cả nguồn có sẵn
 
-Kết quả: in ra màn hình + lưu CSV trong thư mục ./results/
+Kết quả: in ra màn hình + lưu CSV trong thư mục được chọn bằng --output-dir.
 ===================================================================
 """
 
@@ -38,40 +38,22 @@ import os
 import csv
 import glob
 import argparse
+import math
 import time
 from collections import defaultdict
 
-# ==================================================================
-# 1. NGƯỠNG - DÙNG CHUNG VỚI drowsiness_detection.py
-#    (giữ nguyên để kết quả đánh giá khớp với hệ thống demo)
-# ==================================================================
-# --- Ngưỡng giá trị (không phụ thuộc fps) ---
-EAR_THRESHOLD = 0.21        # EAR < ngưỡng => mắt nhắm
-MAR_THRESHOLD = 0.6         # MAR > ngưỡng => miệng mở (ngáp)
-TILT_THRESHOLD = 15         # tilt > ngưỡng => nghiêng đầu
-
-# --- Ngưỡng "số frame liên tiếp" GỐC, định nghĩa ở 30 fps ---
-# (giữ đúng giá trị trong drowsiness_detection.py để làm tham chiếu)
-REFERENCE_FPS = 30.0
-EAR_CONSEC_FRAMES = 30      # 20 frame @30fps  ~= 0.67 giây
-MAR_CONSEC_FRAMES = 15      # 15 frame @30fps  ~= 0.50 giây
-TILT_CONSEC_FRAMES = 20     # 20 frame @30fps  ~= 0.67 giây
-
-# --- Quy đổi các ngưỡng trên sang GIÂY (nguồn sự thật khi chuẩn hóa) ---
-# Nhờ đó, dù video quay ở fps nào, "khoảng thời gian" cần thiết để kích
-# hoạt cảnh báo vẫn giữ nguyên tính bằng giây, không bị lệch theo fps.
-EAR_CONSEC_SECONDS  = EAR_CONSEC_FRAMES  / REFERENCE_FPS   # ~0.667s
-MAR_CONSEC_SECONDS  = MAR_CONSEC_FRAMES  / REFERENCE_FPS   # ~0.500s
-TILT_CONSEC_SECONDS = TILT_CONSEC_FRAMES / REFERENCE_FPS   # ~0.667s
+from config import (
+    EAR_CONSEC_SECONDS,
+    EAR_THRESHOLD,
+    MAR_CONSEC_SECONDS,
+    MAR_THRESHOLD,
+    TILT_CONSEC_SECONDS,
+    TILT_THRESHOLD,
+)
+from temporal_logic import DurationTracker
 
 
-def frames_for_seconds(seconds, fps):
-    """
-    Quy đổi 'seconds' giây sang số frame liên tiếp tương ứng với fps thực tế.
-    Tối thiểu 1 frame để tránh ngưỡng = 0 khi fps rất thấp.
-    """
-    n = int(round(seconds * fps))
-    return max(1, n)
+RESULTS_DIR = "results"
 
 # ==================================================================
 # 2. CHỈ SỐ LANDMARK (giống code gốc)
@@ -196,13 +178,13 @@ def print_metrics(title, m, extra=None):
 
 
 def ensure_results_dir():
-    os.makedirs("results", exist_ok=True)
+    os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def save_metrics_csv(filename, rows, fieldnames):
-    """rows: list các dict. Ghi ra results/<filename>."""
+    """rows: list các dict. Ghi vào RESULTS_DIR/<filename>."""
     ensure_results_dir()
-    path = os.path.join("results", filename)
+    path = os.path.join(RESULTS_DIR, filename)
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -241,8 +223,8 @@ def evaluate_ddd(ddd_dir, limit=None):
             print(f"  [CẢNH BÁO] Không thấy thư mục: {cls_dir} -> bỏ qua")
             continue
 
-        files = [f for f in glob.glob(os.path.join(cls_dir, "*"))
-                 if f.endswith(IMG_EXTS)]
+        files = sorted(f for f in glob.glob(os.path.join(cls_dir, "*"))
+                       if f.endswith(IMG_EXTS))
         if limit:
             files = files[:limit]
         print(f"  Đang xử lý lớp '{cls_name}': {len(files)} ảnh...")
@@ -330,8 +312,8 @@ def evaluate_yawn(yawn_dir, splits=("train", "test"), limit=None):
                 print(f"  [CẢNH BÁO] Không thấy: {cls_dir} -> bỏ qua")
                 continue
 
-            files = [f for f in glob.glob(os.path.join(cls_dir, "*"))
-                     if f.endswith(IMG_EXTS)]
+            files = sorted(f for f in glob.glob(os.path.join(cls_dir, "*"))
+                           if f.endswith(IMG_EXTS))
             if limit:
                 files = files[:limit]
             print(f"  '{split}/{cls_name}': {len(files)} ảnh...")
@@ -383,7 +365,7 @@ def evaluate_yawn(yawn_dir, splits=("train", "test"), limit=None):
 
 
 # ==================================================================
-# 8. ĐÁNH GIÁ VIDEO (theo thời gian) - giữ logic đếm frame liên tiếp
+# 8. ĐÁNH GIÁ VIDEO (theo thời gian)
 # ==================================================================
 # Ánh xạ tên event trong CSV <-> loại dấu hiệu
 EVENT_TYPES = ["eye_closed", "yawn", "head_tilt"]
@@ -423,10 +405,19 @@ def find_csv_for_video(video_path):
     return csv_path if os.path.isfile(csv_path) else None
 
 
+def subject_from_video_name(video_name):
+    """Binh_alert.mp4 / Binh_drowsy.mp4 -> Binh."""
+    stem = os.path.splitext(os.path.basename(video_name))[0]
+    for suffix in ("_alert", "_drowsy"):
+        if stem.lower().endswith(suffix):
+            return stem[:-len(suffix)]
+    return stem
+
+
 def run_system_on_video(video_path):
     """
-    Chạy hệ thống trên video, GIỮ logic đếm frame liên tiếp giống
-    drowsiness_detection.py. Trả về:
+    Chạy hệ thống với cùng DurationTracker và ngưỡng theo giây như demo.
+    Mỗi frame đóng góp 1/fps giây vào chuỗi liên tục. Trả về:
       - fps của video
       - per_frame: list, mỗi phần tử là dict báo mỗi loại dấu hiệu
         có ĐANG cảnh báo ở frame đó không (sau khi qua bộ đếm liên tiếp)
@@ -443,14 +434,10 @@ def run_system_on_video(video_path):
     if not fps or fps <= 0:
         fps = 30.0  # fallback nếu không đọc được
 
-    # --- CHUẨN HÓA NGƯỠNG THEO FPS THỰC TẾ ---
-    # Thay vì dùng số frame cố định (thiết kế cho 30fps), ta quy đổi
-    # khoảng thời gian (giây) sang số frame theo fps của CHÍNH video này.
-    # Nhờ vậy video 16fps hay 30fps đều yêu cầu cùng MỘT khoảng thời gian
-    # (vd ~0.67s cho mắt) mới kích hoạt cảnh báo -> kết quả nhất quán.
-    ear_frames  = frames_for_seconds(EAR_CONSEC_SECONDS,  fps)
-    mar_frames  = frames_for_seconds(MAR_CONSEC_SECONDS,  fps)
-    tilt_frames = frames_for_seconds(TILT_CONSEC_SECONDS, fps)
+    # Các con số frame dưới đây chỉ để hiển thị. Nguồn sự thật là thời gian.
+    ear_frames = max(1, math.ceil(EAR_CONSEC_SECONDS * fps - 1e-9))
+    mar_frames = max(1, math.ceil(MAR_CONSEC_SECONDS * fps - 1e-9))
+    tilt_frames = max(1, math.ceil(TILT_CONSEC_SECONDS * fps - 1e-9))
     print(f"      Ngưỡng theo fps={fps:.1f}: "
           f"eye>={ear_frames}f ({EAR_CONSEC_SECONDS:.2f}s) | "
           f"yawn>={mar_frames}f ({MAR_CONSEC_SECONDS:.2f}s) | "
@@ -459,9 +446,10 @@ def run_system_on_video(video_path):
     # dùng static=False để tận dụng tracking giữa frame (giống demo realtime)
     face_mesh = make_face_mesh(static=False)
 
-    eye_counter = 0
-    mouth_counter = 0
-    tilt_counter = 0
+    frame_duration = 1.0 / fps
+    eye_tracker = DurationTracker(EAR_CONSEC_SECONDS)
+    mouth_tracker = DurationTracker(MAR_CONSEC_SECONDS)
+    tilt_tracker = DurationTracker(TILT_CONSEC_SECONDS)
 
     per_frame = []
     no_face_frames = 0
@@ -479,34 +467,19 @@ def run_system_on_video(video_path):
 
         if metrics is None:
             no_face_frames += 1
-            # mất mặt -> reset các bộ đếm (giống như khi mất tracking)
-            eye_counter = mouth_counter = tilt_counter = 0
+            # Mất mặt làm gián đoạn chuỗi thời gian của mọi dấu hiệu.
+            eye_tracker.reset()
+            mouth_tracker.reset()
+            tilt_tracker.reset()
             per_frame.append(active)
             continue
 
-        # ---- Mắt ----
-        if metrics["ear"] < EAR_THRESHOLD:
-            eye_counter += 1
-            if eye_counter >= ear_frames:
-                active["eye_closed"] = True
-        else:
-            eye_counter = 0
-
-        # ---- Ngáp ----
-        if metrics["mar"] > MAR_THRESHOLD:
-            mouth_counter += 1
-            if mouth_counter >= mar_frames:
-                active["yawn"] = True
-        else:
-            mouth_counter = 0
-
-        # ---- Nghiêng đầu ----
-        if metrics["tilt"] > TILT_THRESHOLD:
-            tilt_counter += 1
-            if tilt_counter >= tilt_frames:
-                active["head_tilt"] = True
-        else:
-            tilt_counter = 0
+        active["eye_closed"] = eye_tracker.update(
+            metrics["ear"] < EAR_THRESHOLD, frame_duration)
+        active["yawn"] = mouth_tracker.update(
+            metrics["mar"] > MAR_THRESHOLD, frame_duration)
+        active["head_tilt"] = tilt_tracker.update(
+            metrics["tilt"] > TILT_THRESHOLD, frame_duration)
 
         per_frame.append(active)
 
@@ -657,10 +630,19 @@ def evaluate_video(video_dir, overlap_ratio=0.3):
     el_accum = {ev: {"true_events":0,"hit":0,"miss":0,"false_alarm":0}
                 for ev in EVENT_TYPES}
 
+    # Tổng hợp riêng theo thành viên để tránh video dài chi phối mà không rõ.
+    subject_fl = defaultdict(
+        lambda: {ev: {"TP":0,"TN":0,"FP":0,"FN":0}
+                 for ev in EVENT_TYPES})
+    subject_el = defaultdict(
+        lambda: {ev: {"true_events":0,"hit":0,"miss":0,"false_alarm":0}
+                 for ev in EVENT_TYPES})
+
     per_video_rows = []   # để lưu chi tiết từng video
 
     for vpath in sorted(video_files):
         vname = os.path.basename(vpath)
+        subject = subject_from_video_name(vname)
         csv_path = find_csv_for_video(vpath)
         if csv_path is None:
             print(f"  [BỎ QUA] {vname}: không có file .csv nhãn cùng tên.")
@@ -689,12 +671,14 @@ def evaluate_video(video_dir, overlap_ratio=0.3):
         for ev in EVENT_TYPES:
             for k in ("TP","TN","FP","FN"):
                 fl_accum[ev][k] += fl[ev][k]
+                subject_fl[subject][ev][k] += fl[ev][k]
 
         # --- event-level ---
         el = evaluate_video_event_level(per_frame, events, fps, overlap_ratio)
         for ev in EVENT_TYPES:
             for k in ("true_events","hit","miss","false_alarm"):
                 el_accum[ev][k] += el[ev][k]
+                subject_el[subject][ev][k] += el[ev][k]
 
         # in nhanh kết quả video này
         for ev in EVENT_TYPES:
@@ -704,7 +688,7 @@ def evaluate_video(video_dir, overlap_ratio=0.3):
                   f"false_alarm={el[ev]['false_alarm']}")
 
         per_video_rows.append({
-            "video": vname, "total_frames": total_frames,
+            "subject": subject, "video": vname, "total_frames": total_frames,
             "fps": round(fps,1), "no_face_frames": nf,
             "no_face_rate_percent": round(nf_rate,2),
         })
@@ -755,14 +739,77 @@ def evaluate_video(video_dir, overlap_ratio=0.3):
                                  "miss","false_alarm","recall","precision"])
     if per_video_rows:
         save_metrics_csv("video_per_file.csv", per_video_rows,
-                         fieldnames=["video","total_frames","fps",
+                         fieldnames=["subject","video","total_frames","fps",
                                      "no_face_frames","no_face_rate_percent"])
+
+    # ============ KẾT QUẢ RIÊNG THEO THÀNH VIÊN ============
+    subject_fl_rows = []
+    subject_el_rows = []
+    for subject in sorted(subject_fl):
+        for ev in EVENT_TYPES:
+            a = subject_fl[subject][ev]
+            m = compute_metrics(a["TP"], a["TN"], a["FP"], a["FN"])
+            subject_fl_rows.append({
+                "subject": subject,
+                "level": "frame",
+                "event_type": ev,
+                **m,
+                "positive_frames": a["TP"] + a["FN"],
+                "negative_frames": a["TN"] + a["FP"],
+            })
+
+            e = subject_el[subject][ev]
+            n_true = e["true_events"]
+            n_pred = e["hit"] + e["false_alarm"]
+            recall = e["hit"] / n_true if n_true else ""
+            precision = e["hit"] / n_pred if n_pred else ""
+            subject_el_rows.append({
+                "subject": subject,
+                "level": "event",
+                "event_type": ev,
+                "true_events": n_true,
+                "hit": e["hit"],
+                "miss": e["miss"],
+                "false_alarm": e["false_alarm"],
+                "recall": recall,
+                "precision": precision,
+            })
+
+    if subject_fl_rows:
+        save_metrics_csv(
+            "video_frame_level_per_subject.csv",
+            subject_fl_rows,
+            fieldnames=["subject","level","event_type","TP","TN","FP","FN",
+                        "accuracy","precision","recall","f1",
+                        "positive_frames","negative_frames"],
+        )
+        save_metrics_csv(
+            "video_event_level_per_subject.csv",
+            subject_el_rows,
+            fieldnames=["subject","level","event_type","true_events","hit",
+                        "miss","false_alarm","recall","precision"],
+        )
+
+    save_metrics_csv(
+        "video_run_config.csv",
+        [
+            {"parameter": "EAR_THRESHOLD", "value": EAR_THRESHOLD, "unit": "ratio"},
+            {"parameter": "EAR_CONSEC_SECONDS", "value": EAR_CONSEC_SECONDS, "unit": "seconds"},
+            {"parameter": "MAR_THRESHOLD", "value": MAR_THRESHOLD, "unit": "ratio"},
+            {"parameter": "MAR_CONSEC_SECONDS", "value": MAR_CONSEC_SECONDS, "unit": "seconds"},
+            {"parameter": "TILT_THRESHOLD", "value": TILT_THRESHOLD, "unit": "degrees"},
+            {"parameter": "TILT_CONSEC_SECONDS", "value": TILT_CONSEC_SECONDS, "unit": "seconds"},
+            {"parameter": "EVENT_OVERLAP_RATIO", "value": overlap_ratio, "unit": "ratio"},
+        ],
+        fieldnames=["parameter", "value", "unit"],
+    )
 
 
 # ==================================================================
 # 9. MAIN / CLI
 # ==================================================================
 def main():
+    global RESULTS_DIR
     parser = argparse.ArgumentParser(
         description="Script đánh giá tổng hợp CPV301 - Drowsiness Detection")
     parser.add_argument("--ddd", metavar="DIR",
@@ -778,12 +825,17 @@ def main():
     parser.add_argument("--overlap", type=float, default=0.3,
                         help="Tỷ lệ chồng lấn tối thiểu để tính 'bắt được' "
                              "sự kiện (event-level, mặc định 0.3)")
+    parser.add_argument("--output-dir", default="results", metavar="DIR",
+                        help="Thư mục lưu CSV (mặc định: ./results)")
     args = parser.parse_args()
+    RESULTS_DIR = os.path.abspath(args.output_dir)
 
     if args.all:
         ddd_dir  = os.path.join(args.all, "driver_drowsiness_dataset")
         yawn_dir = os.path.join(args.all, "yawn_eye_dataset_new")
-        video_dir = os.path.join(args.all, "video")
+        video_submission = os.path.join(args.all, "video_submission")
+        video_dir = (video_submission if os.path.isdir(video_submission)
+                     else os.path.join(args.all, "video"))
         if os.path.isdir(ddd_dir):
             evaluate_ddd(ddd_dir, limit=args.limit)
         if os.path.isdir(yawn_dir):

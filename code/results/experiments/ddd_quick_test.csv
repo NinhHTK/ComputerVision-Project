@@ -1,0 +1,2 @@
+source,TP,TN,FP,FN,accuracy,precision,recall,f1,processed,no_face,no_face_rate_percent,seconds
+DDD,233,440,60,267,0.673,0.7952218430034129,0.466,0.587641866330391,1000,0,0.0,14.8

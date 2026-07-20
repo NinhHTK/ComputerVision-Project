@@ -1,4 +1,0 @@
-level,event_type,true_events,hit,miss,false_alarm,recall,precision
-event,eye_closed,10,10,0,20,1.0,0.3333
-event,yawn,6,6,0,0,1.0,1.0
-event,head_tilt,6,0,6,0,0.0,0.0

@@ -18,17 +18,15 @@ import mediapipe as mp
 import numpy as np
 import time
 
-# ------------------------------------------------------------------
-# 1. CẤU HÌNH NGƯỠNG (tinh chỉnh lại cho phù hợp khuôn mặt của bạn)
-# ------------------------------------------------------------------
-EAR_THRESHOLD = 0.21        # EAR nhỏ hơn ngưỡng này => coi như mắt đang nhắm
-EAR_CONSEC_FRAMES = 30      # Số frame liên tiếp mắt nhắm mới báo "ngủ gật"
-
-MAR_THRESHOLD = 0.6         # MAR lớn hơn ngưỡng này => coi như miệng đang mở (ngáp)
-MAR_CONSEC_FRAMES = 15      # Số frame liên tiếp mở miệng mới tính là 1 lần ngáp
-
-TILT_THRESHOLD = 15         # Độ nghiêng đầu (độ) vượt ngưỡng => cảnh báo gục đầu
-TILT_CONSEC_FRAMES = 20
+from config import (
+    EAR_CONSEC_SECONDS,
+    EAR_THRESHOLD,
+    MAR_CONSEC_SECONDS,
+    MAR_THRESHOLD,
+    TILT_CONSEC_SECONDS,
+    TILT_THRESHOLD,
+)
+from temporal_logic import DurationTracker
 
 # ------------------------------------------------------------------
 # 2. CHỈ SỐ LANDMARK CỦA MEDIAPIPE FACE MESH (468 điểm)
@@ -109,18 +107,22 @@ def main():
         print("Không mở được webcam. Kiểm tra lại camera.")
         return
 
-    # Bộ đếm frame cho từng dấu hiệu
-    eye_counter = 0
-    mouth_counter = 0
-    tilt_counter = 0
-    yawn_count = 0                   # tổng số lần ngáp phát hiện được
+    # Cùng một logic thời gian được dùng trong evaluate.py.
+    eye_tracker = DurationTracker(EAR_CONSEC_SECONDS)
+    mouth_tracker = DurationTracker(MAR_CONSEC_SECONDS)
+    tilt_tracker = DurationTracker(TILT_CONSEC_SECONDS)
+    yawn_count = 0
 
-    prev_time = time.time()
+    prev_time = time.monotonic()
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
+
+        now = time.monotonic()
+        frame_delta = max(0.0, now - prev_time)
+        prev_time = now
 
         frame = cv2.flip(frame, 1)   # lật ngang cho giống gương
         h, w = frame.shape[:2]
@@ -152,31 +154,17 @@ def main():
             for p in left_eye + right_eye + mouth_pts:
                 cv2.circle(frame, p, 2, (0, 255, 0), -1)
 
-            # ---- Logic phán đoán MẮT NHẮM ----
-            if ear < EAR_THRESHOLD:
-                eye_counter += 1
-                if eye_counter >= EAR_CONSEC_FRAMES:
-                    alert_msgs.append("CANH BAO: NGU GAT!")
-            else:
-                eye_counter = 0
+            # ---- Logic thời gian (không phụ thuộc FPS) ----
+            if eye_tracker.update(ear < EAR_THRESHOLD, frame_delta):
+                alert_msgs.append("CANH BAO: NGU GAT!")
 
-            # ---- Logic phán đoán NGÁP ----
-            if mar > MAR_THRESHOLD:
-                mouth_counter += 1
-                if mouth_counter == MAR_CONSEC_FRAMES:
-                    yawn_count += 1      # đếm 1 lần ngáp khi đủ số frame
-                if mouth_counter >= MAR_CONSEC_FRAMES:
-                    alert_msgs.append("CANH BAO: DANG NGAP!")
-            else:
-                mouth_counter = 0
+            if mouth_tracker.update(mar > MAR_THRESHOLD, frame_delta):
+                alert_msgs.append("CANH BAO: DANG NGAP!")
+            if mouth_tracker.just_activated:
+                yawn_count += 1
 
-            # ---- Logic phán đoán GỤC/NGHIÊNG ĐẦU ----
-            if tilt > TILT_THRESHOLD:
-                tilt_counter += 1
-                if tilt_counter >= TILT_CONSEC_FRAMES:
-                    alert_msgs.append("CANH BAO: NGHIENG DAU!")
-            else:
-                tilt_counter = 0
+            if tilt_tracker.update(tilt > TILT_THRESHOLD, frame_delta):
+                alert_msgs.append("CANH BAO: NGHIENG DAU!")
 
             # ---- Hiển thị chỉ số ----
             cv2.putText(frame, f"EAR: {ear:.2f}", (10, 30),
@@ -188,6 +176,10 @@ def main():
             cv2.putText(frame, f"So lan ngap: {yawn_count}", (10, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
         else:
+            # Mất mặt làm gián đoạn chuỗi thời gian của mọi dấu hiệu.
+            eye_tracker.reset()
+            mouth_tracker.reset()
+            tilt_tracker.reset()
             cv2.putText(frame, "Khong phat hien khuon mat", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
@@ -198,9 +190,7 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 3)
 
         # ---- FPS ----
-        now = time.time()
-        fps = 1.0 / (now - prev_time) if now != prev_time else 0
-        prev_time = now
+        fps = 1.0 / frame_delta if frame_delta > 0 else 0
         cv2.putText(frame, f"FPS: {fps:.0f}", (w - 120, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2)
 
