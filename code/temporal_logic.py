@@ -1,11 +1,11 @@
-"""Logic thời gian dùng chung cho realtime và video evaluation."""
+"""Temporal logic shared by realtime detection and video evaluation."""
 
 from dataclasses import dataclass
 
 
 @dataclass
 class DurationTracker:
-    """Theo dõi một điều kiện phải đúng liên tục trong một khoảng thời gian."""
+    """Track a condition that must remain true for a continuous duration."""
 
     min_duration_seconds: float
     elapsed_seconds: float = 0.0
@@ -14,7 +14,7 @@ class DurationTracker:
 
     def __post_init__(self):
         if self.min_duration_seconds <= 0:
-            raise ValueError("min_duration_seconds phải lớn hơn 0")
+            raise ValueError("min_duration_seconds must be greater than 0")
 
     def reset(self):
         self.elapsed_seconds = 0.0
@@ -23,10 +23,10 @@ class DurationTracker:
 
     def update(self, condition, delta_seconds):
         """
-        Cập nhật trạng thái với thời lượng của mẫu/frame hiện tại.
+        Update state using the duration of the current sample/frame.
 
-        `just_activated` chỉ True đúng một lần khi điều kiện lần đầu đạt
-        ngưỡng thời gian. Khi condition=False, chuỗi liên tục bị reset.
+        `just_activated` is true only once when the duration threshold is first
+        reached. When condition=False, the continuous sequence is reset.
         """
         self.just_activated = False
 

@@ -2,68 +2,71 @@
 
 ## `full/static/`
 
-Kết quả trên toàn bộ dataset ảnh tĩnh dùng trong báo cáo:
+Results on the complete external image datasets used in the report:
 
-- `ddd_full.csv`: đánh giá toàn hệ thống trên DDD.
-- `yawn_full_mar060.csv`: đánh giá riêng MAR trên yawn_eye với ngưỡng 0.60.
+- `ddd_full.csv`: complete DDD system evaluation.
+- `yawn_full_mar060.csv`: MAR-only yawn_eye evaluation at threshold 0.60.
 
 ## `sample_smoke_test/`
 
-Kết quả trên 300 ảnh mẫu đi kèm bài nộp. Các file này chỉ dùng xác minh pipeline,
-không thay thế kết quả full dataset.
+Results on the 300 images bundled with the submission. These files verify the
+pipeline and do not replace the full-dataset results.
 
 ## `experiments/`
 
-- `ddd_quick_test.csv`: quick test với tối đa 500 ảnh mỗi lớp DDD.
-- `ear_threshold_sweep/`: thử nghiệm EAR và thời gian trên video của Bình dùng
-  trong giai đoạn lựa chọn cấu hình.
-- `mar_threshold_sweep/static/`: thử nghiệm ngưỡng MAR trên full yawn_eye.
+- `ddd_quick_test.csv`: quick test using at most 500 DDD images per class.
+- `ear_threshold_sweep/`: EAR threshold/duration experiments on Binh's videos
+  during configuration selection.
+- `mar_threshold_sweep/static/`: MAR threshold experiments on the full
+  yawn_eye dataset.
 
-### Cấu hình `ear_threshold_sweep/`
+### `ear_threshold_sweep/` configuration
 
-Các tên `Baseline`, `A`, `B`, `C` là những cấu hình nội bộ dùng để khảo sát
-độ nhạy của ngưỡng EAR và thời gian mắt phải nhắm liên tục. Đây không phải là
-các phương pháp baseline lấy từ related work.
+`Baseline`, `A`, `B`, and `C` are internal configurations used to study
+sensitivity to the EAR threshold and continuous eye-closure duration. They are
+not baseline methods taken from related work.
 
-| Cấu hình | EAR threshold | Số frame tham chiếu tại 30 FPS | Thời gian tương đương | Mục đích |
+| Configuration | EAR threshold | Reference frames at 30 FPS | Equivalent duration | Purpose |
 |---|---:|---:|---:|---|
-| Baseline | 0.21 | 20 | 0.67 giây | Cấu hình ban đầu |
-| A | 0.18 | 20 | 0.67 giây | Siết riêng ngưỡng EAR |
-| B | 0.21 | 30 | 1.00 giây | Tăng riêng thời gian duy trì; cấu hình được chọn |
-| C | 0.19 | 25 | 0.83 giây | Thay đổi đồng thời EAR và thời gian duy trì |
+| Baseline | 0.21 | 20 | 0.67 seconds | Initial configuration |
+| A | 0.18 | 20 | 0.67 seconds | Tighten only the EAR threshold |
+| B | 0.21 | 30 | 1.00 second | Increase only duration; selected configuration |
+| C | 0.19 | 25 | 0.83 seconds | Change both EAR and duration |
 
-Các CSV `video_*_baseline.csv`, `video_*_earA.csv`, `video_*_earB.csv` và
-`video_*_earC.csv` được tạo trên cặp video của Bình trong giai đoạn lựa chọn
-cấu hình. Cột “số frame tham chiếu” chỉ dùng để mô tả thiết kế cũ tại 30 FPS;
-giá trị thời gian tương đương mới là ý nghĩa cần dùng khi so sánh video có FPS
-khác nhau.
+The `video_*_baseline.csv`, `video_*_earA.csv`, `video_*_earB.csv`, and
+`video_*_earC.csv` files were generated from Binh's video pair during
+configuration selection. “Reference frames” describe the legacy design at
+30 FPS; equivalent duration is the correct interpretation across videos with
+different FPS values.
 
-Kết quả cuối trong `final_video/` đã được chạy lại bằng `DurationTracker` theo
-giây với cấu hình B: `EAR_THRESHOLD=0.21` và `EAR_CONSEC_SECONDS=1.0`. Vì vậy,
-không suy diễn trực tiếp các CSV sweep một người thành kết quả tổng quát cho cả
-ba thành viên.
+Final results in `final_video/` were rerun with the seconds-based
+`DurationTracker` and configuration B: `EAR_THRESHOLD=0.21` and
+`EAR_CONSEC_SECONDS=1.0`. The one-subject sweep must not be interpreted as a
+general result for all three subjects.
 
-### Cấu hình `mar_threshold_sweep/static/`
+### `mar_threshold_sweep/static/` configuration
 
-Các file trong thư mục này tương ứng với bốn giá trị `MAR_THRESHOLD`: 0.45,
-0.50, 0.55 và 0.60. Cấu hình cuối sử dụng `MAR_THRESHOLD=0.60`; kết quả cuối
-trên full yawn_eye nằm tại `full/static/yawn_full_mar060.csv`.
+The files correspond to `MAR_THRESHOLD` values 0.45, 0.50, 0.55, and 0.60. The
+final configuration uses `MAR_THRESHOLD=0.60`; its complete yawn_eye result is
+stored in `full/static/yawn_full_mar060.csv`.
 
 ## `final_video/`
 
-Kết quả video cuối sau khi chuyển logic cảnh báo sang thời gian:
+Final video results after converting temporal logic to seconds:
 
-- `video_frame_level.csv`: frame-level tổng hợp.
-- `video_event_level.csv`: event-level tổng hợp.
-- `video_frame_level_per_subject.csv`: frame-level theo thành viên.
-- `video_event_level_per_subject.csv`: event-level theo thành viên.
-- `video_per_file.csv`: FPS, số frame và tỷ lệ mất mặt của từng video.
-- `video_run_config.csv`: ngưỡng, thời gian duy trì và event overlap của lần chạy.
+- `video_frame_level.csv`: aggregate frame-level metrics.
+- `video_event_level.csv`: aggregate event-level metrics.
+- `video_frame_level_per_subject.csv`: frame-level metrics by subject.
+- `video_event_level_per_subject.csv`: event-level metrics by subject.
+- `video_per_file.csv`: FPS, frame count, and no-face rate for each video.
+- `video_run_config.csv`: thresholds, continuous durations, and event overlap.
 
-Kết quả theo thành viên là phân tích chính vì giao thức quay của ba thành viên
-không đồng nhất. Chỉ số tổng hợp được dùng như thông tin bổ sung.
+Per-subject results are primary because the three recording protocols were not
+uniform. Aggregate metrics are supplementary.
 
-## Kết quả lưu trữ cục bộ
+## Locally archived results
 
-Kết quả trước khi sửa timing và kết quả có input video trùng lặp được giữ cục bộ
-để audit nhưng không nằm trong kết quả cuối hoặc gói submission.
+Pre-timing-fix results and results generated from accidentally duplicated video
+inputs are retained locally for audit purposes but excluded from the final
+results and submission package.
+

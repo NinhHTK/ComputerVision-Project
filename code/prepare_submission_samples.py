@@ -1,6 +1,6 @@
-"""Tạo bộ ảnh mẫu tái lập cho gói submission.
+"""Create a reproducible image sample for the submission package.
 
-Chạy từ thư mục gốc project:
+Run from the project root:
 python code/prepare_submission_samples.py --ddd dataset/driver_drowsiness_dataset --yawn dataset/yawn_eye_dataset_new --output dataset/samples --count 50 --seed 42
 """
 
@@ -39,7 +39,7 @@ def sample_images(
     output_dir = Path(output_dir)
 
     if not source_dir.is_dir():
-        raise FileNotFoundError(f"Không tìm thấy thư mục: {source_dir}")
+        raise FileNotFoundError(f"Directory not found: {source_dir}")
 
     images = sorted(
         path
@@ -48,16 +48,16 @@ def sample_images(
     )
 
     if not images:
-        raise RuntimeError(f"Không có ảnh hợp lệ trong: {source_dir}")
+        raise RuntimeError(f"No valid images found in: {source_dir}")
 
     if len(images) < count:
         print(
-            f"[CẢNH BÁO] {source_dir} chỉ có {len(images)} ảnh; "
-            f"sẽ copy toàn bộ thay vì {count} ảnh."
+            f"[WARNING] {source_dir} contains only {len(images)} images; "
+            f"all images will be copied instead of {count}."
         )
         selected = images
     else:
-        # Tạo seed riêng cho từng dataset/split/class.
+        # Create a separate deterministic seed for each dataset/split/class.
         group_seed = f"{seed}:{dataset_name}:{split_name}:{class_name}"
         rng = random.Random(group_seed)
         selected = sorted(rng.sample(images, count))
@@ -89,40 +89,40 @@ def sample_images(
 
     print(
         f"[OK] {dataset_name}/{split_name}/{class_name}: "
-        f"{len(selected)} ảnh -> {output_dir}"
+        f"{len(selected)} images -> {output_dir}"
     )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Tạo sample dataset cho gói nộp CPV301."
+        description="Create a sample dataset for the CPV301 submission."
     )
     parser.add_argument(
         "--ddd",
         required=True,
-        help="Thư mục DDD chứa drowsy/ và non_drowsy/.",
+        help="DDD directory containing drowsy/ and non_drowsy/.",
     )
     parser.add_argument(
         "--yawn",
         required=True,
-        help="Thư mục yawn_eye chứa train/ và test/.",
+        help="yawn_eye directory containing train/ and test/.",
     )
     parser.add_argument(
         "--output",
         default="../dataset/samples",
-        help="Thư mục output. Mặc định: ../dataset/samples",
+        help="Output directory. Default: ../dataset/samples",
     )
     parser.add_argument(
         "--count",
         type=int,
         default=50,
-        help="Số ảnh mỗi lớp. Mặc định: 50.",
+        help="Number of images per class. Default: 50.",
     )
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="Random seed. Mặc định: 42.",
+        help="Random seed. Default: 42.",
     )
     args = parser.parse_args()
 
@@ -132,7 +132,7 @@ def main():
 
     manifest_rows = []
 
-    # DDD: 50 ảnh cho mỗi lớp
+    # DDD: 50 images per class
     for class_name in ("drowsy", "non_drowsy"):
         sample_images(
             source_dir=ddd_root / class_name,
@@ -145,7 +145,7 @@ def main():
             manifest_rows=manifest_rows,
         )
 
-    # yawn_eye: 50 ảnh/lớp/split
+    # yawn_eye: 50 images per class per split
     for split_name in ("train", "test"):
         for class_name in ("yawn", "no_yawn"):
             sample_images(
@@ -184,8 +184,8 @@ def main():
         writer.writeheader()
         writer.writerows(manifest_rows)
 
-    print(f"\nĐã tạo manifest: {manifest_path}")
-    print(f"Tổng số ảnh: {len(manifest_rows)}")
+    print(f"\nManifest created: {manifest_path}")
+    print(f"Total images: {len(manifest_rows)}")
 
 
 if __name__ == "__main__":

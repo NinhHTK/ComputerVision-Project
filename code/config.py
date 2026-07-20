@@ -1,15 +1,15 @@
-"""Cấu hình dùng chung cho demo realtime và script đánh giá."""
+"""Shared configuration for the realtime demo and evaluation script."""
 
-# Ngưỡng hình học
+# Geometric thresholds
 EAR_THRESHOLD = 0.21
 MAR_THRESHOLD = 0.60
 TILT_THRESHOLD = 15.0
 
-# Thời gian dấu hiệu phải xuất hiện liên tục trước khi cảnh báo.
-# Đây là nguồn sự thật duy nhất; không định nghĩa lại bằng số frame.
-EAR_CONSEC_SECONDS = 1.0          # tương đương 30 frame tại 30 FPS
-MAR_CONSEC_SECONDS = 0.5          # tương đương 15 frame tại 30 FPS
-TILT_CONSEC_SECONDS = 2.0 / 3.0   # tương đương 20 frame tại 30 FPS
+# Time for which a sign must remain continuous before an alert is raised.
+# This is the single source of truth; do not redefine it as a frame count.
+EAR_CONSEC_SECONDS = 1.0          # equivalent to 30 frames at 30 FPS
+MAR_CONSEC_SECONDS = 0.5          # equivalent to 15 frames at 30 FPS
+TILT_CONSEC_SECONDS = 2.0 / 3.0   # equivalent to 20 frames at 30 FPS
 
-# Chỉ dùng để giải thích/đối chiếu cấu hình cũ trong báo cáo.
+# Used only to explain/compare the legacy configuration in the report.
 REFERENCE_FPS = 30.0
