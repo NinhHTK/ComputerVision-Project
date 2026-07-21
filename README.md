@@ -11,6 +11,27 @@ MediaPipe Face Mesh extracts facial landmarks. Alert decisions are based on
 explainable geometric features and temporal rules; no new deep-learning model
 is trained.
 
+## Important: Where to find the reported results
+
+The submission **already includes the CSV results used in the report**. A
+reviewer does not need to download the full multi-gigabyte datasets merely to
+inspect the recorded experimental results.
+
+| Evidence | Files to inspect | How it should be used |
+|---|---|---|
+| Final full-dataset image results | `code/results/full/static/ddd_full.csv` and `code/results/full/static/yawn_full_mar060.csv` | Primary static-image results |
+| Final video results by subject | `code/results/final_video/video_frame_level_per_subject.csv` and `video_event_level_per_subject.csv` | Primary video results because recording protocols differ by subject |
+| Final pooled video results (`N = 3`) | `code/results/final_video/video_frame_level.csv` and `video_event_level.csv` | Supplementary summary; not a controlled cross-subject generalization result |
+| Video input and run details | `code/results/final_video/video_per_file.csv` and `video_run_config.csv` | FPS, frame count, no-face rate, thresholds, and timing configuration |
+| EAR/MAR configuration experiments | `code/results/experiments/` | Parameter-sensitivity and configuration-selection evidence |
+| Submission smoke test | `code/results/sample_smoke_test/` | Reproducibility check on the 300 bundled sample images; not the final scientific result |
+| Generated visualizations | `figures/` | Report-ready figures generated directly from the CSV files |
+
+Start with [`code/results/README.md`](code/results/README.md) for metric
+definitions, the exact meaning of every result group, configuration A/B/C
+mapping, and interpretation cautions. Suggested figure captions and source-CSV
+mapping are provided in [`figures/README.md`](figures/README.md).
+
 ## 1. Tested environment
 
 - Windows 10/11
@@ -18,6 +39,7 @@ is trained.
 - OpenCV `4.11.0`
 - MediaPipe `0.10.21`
 - NumPy `1.26.4`
+- Matplotlib `3.11.0`
 
 The project does not bundle a Python environment. All direct dependencies are
 declared in `code/requirements.txt`.
@@ -41,7 +63,7 @@ Verify the environment:
 
 ```powershell
 python -m pip check
-python -c "import cv2, mediapipe, numpy; print(cv2.__version__, mediapipe.__version__, numpy.__version__)"
+python -c "import cv2, mediapipe, numpy, matplotlib; print(cv2.__version__, mediapipe.__version__, numpy.__version__, matplotlib.__version__)"
 ```
 
 The expected `pip check` output is `No broken requirements found.`
@@ -176,20 +198,40 @@ video evaluation.
 
 See `code/results/README.md` for details.
 
+### Generate report figures
+
+Generate all visualizations from the bundled result CSV files with one command:
+
+```powershell
+python .\code\visualize_results.py
+```
+
+The seven PNG files are written to the project-root `figures/` directory. The output includes
+static confusion matrices, threshold-sensitivity plots, aggregate video
+metrics, per-subject event metrics, and video data-quality information.
+
 ## 7. Project structure
 
 ```text
 ComputerVision-Project-main/
 ├── README.md
 ├── .gitignore
+├── figures/
+│   ├── README.md
+│   └── fig01_...png through fig07_...png
 ├── code/
 │   ├── config.py
 │   ├── temporal_logic.py
 │   ├── drowsiness_detection.py
 │   ├── evaluate.py
 │   ├── prepare_submission_samples.py
+│   ├── visualize_results.py
 │   ├── requirements.txt
 │   └── results/
+│       ├── full/static/
+│       ├── final_video/
+│       ├── experiments/
+│       └── sample_smoke_test/
 └── dataset/
     ├── samples/
     └── video_submission/
@@ -207,4 +249,3 @@ and Python caches are excluded from the submission.
   pooled results must be interpreted cautiously.
 - Fixed geometric thresholds may not generalize to new faces, cameras, or
   lighting conditions.
-

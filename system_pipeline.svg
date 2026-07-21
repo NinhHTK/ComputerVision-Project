@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1000" viewBox="0 0 1800 1000" role="img" aria-labelledby="desc">
+  <desc id="desc">Pipeline for landmark-based detection of eye closure, yawning, and head tilt from webcam frames, static images, and recorded videos.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-dashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      .node { stroke-width: 2.5; }
+      .input { fill: #e0f2fe; stroke: #0284c7; }
+      .process { fill: #f1f5f9; stroke: #475569; }
+      .feature { fill: #dcfce7; stroke: #16a34a; }
+      .decision { fill: #fff7ed; stroke: #ea580c; }
+      .output { fill: #f3e8ff; stroke: #7e22ce; }
+      .failure { fill: #fee2e2; stroke: #dc2626; }
+      .text { font-family: Arial, Helvetica, sans-serif; font-size: 24px; fill: #0f172a; text-anchor: middle; }
+      .small { font-size: 20px; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; fill: #334155; text-anchor: middle; }
+      .edge { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#arrow); }
+      .annotation-edge { fill: none; stroke: #7c3aed; stroke-width: 3; stroke-dasharray: 10 8; marker-end: url(#arrow-dashed); }
+    </style>
+  </defs>
+
+  <!-- Input sources -->
+  <rect class="node input" x="45" y="90" width="245" height="105" rx="18"/>
+  <text class="text" x="167" y="135"><tspan x="167">Webcam</tspan><tspan class="small" x="167" dy="31">live frames</tspan></text>
+
+  <rect class="node input" x="45" y="270" width="245" height="105" rx="18"/>
+  <text class="text" x="167" y="315"><tspan x="167">Static images</tspan><tspan class="small" x="167" dy="31">DDD / yawn_eye</tspan></text>
+
+  <rect class="node input" x="45" y="450" width="245" height="105" rx="18"/>
+  <text class="text" x="167" y="495"><tspan x="167">Recorded videos</tspan><tspan class="small" x="167" dy="31">six submitted files</tspan></text>
+
+  <rect class="node input" x="45" y="705" width="245" height="105" rx="18"/>
+  <text class="text" x="167" y="750"><tspan x="167">Annotations</tspan><tspan class="small" x="167" dy="31">start, end, event</tspan></text>
+
+  <!-- Common front end -->
+  <rect class="node process" x="355" y="305" width="230" height="125" rx="18"/>
+  <text class="text" x="470" y="350"><tspan x="470">Read input</tspan><tspan class="small" x="470" dy="31">BGR to RGB</tspan><tspan class="small" x="470" dy="28">frame / image</tspan></text>
+
+  <rect class="node process" x="650" y="305" width="260" height="125" rx="18"/>
+  <text class="text" x="780" y="350"><tspan x="780">MediaPipe</tspan><tspan x="780" dy="31">Face Mesh</tspan><tspan class="small" x="780" dy="28">up to 468 landmarks</tspan></text>
+
+  <polygon class="node decision" points="1025,285 1140,368 1025,451 910,368"/>
+  <text class="text" x="1025" y="360"><tspan x="1025">Face</tspan><tspan x="1025" dy="30">detected?</tspan></text>
+
+  <rect class="node failure" x="895" y="535" width="270" height="125" rx="18"/>
+  <text class="text" x="1030" y="575"><tspan x="1030">No-face handling</tspan><tspan class="small" x="1030" dy="31">count / exclude sample</tspan><tspan class="small" x="1030" dy="28">reset temporal trackers</tspan></text>
+
+  <!-- Feature extraction -->
+  <rect class="node feature" x="1215" y="80" width="235" height="105" rx="18"/>
+  <text class="text" x="1332" y="125"><tspan x="1332">EAR</tspan><tspan class="small" x="1332" dy="31">eye opening</tspan></text>
+
+  <rect class="node feature" x="1215" y="260" width="235" height="105" rx="18"/>
+  <text class="text" x="1332" y="305"><tspan x="1332">MAR</tspan><tspan class="small" x="1332" dy="31">mouth opening</tspan></text>
+
+  <rect class="node feature" x="1215" y="440" width="235" height="105" rx="18"/>
+  <text class="text" x="1332" y="485"><tspan x="1332">Head-roll angle</tspan><tspan class="small" x="1332" dy="31">outer eye corners</tspan></text>
+
+  <!-- Decision branches -->
+  <rect class="node decision" x="1510" y="80" width="245" height="175" rx="18"/>
+  <text class="text" x="1632" y="120"><tspan x="1632">Static decision</tspan><tspan class="small" x="1632" dy="34">DDD: EAR or MAR</tspan><tspan class="small" x="1632" dy="27">or head roll</tspan><tspan class="small" x="1632" dy="27">yawn_eye: MAR only</tspan></text>
+
+  <rect class="node decision" x="1510" y="330" width="245" height="215" rx="18"/>
+  <text class="text" x="1632" y="370"><tspan x="1632">Temporal rules</tspan><tspan class="small" x="1632" dy="34">EAR: 1.00 s</tspan><tspan class="small" x="1632" dy="27">MAR: 0.50 s</tspan><tspan class="small" x="1632" dy="27">Tilt: 0.67 s</tspan><tspan class="small" x="1632" dy="31">FPS-independent</tspan></text>
+
+  <!-- Outputs -->
+  <rect class="node output" x="1205" y="710" width="250" height="105" rx="18"/>
+  <text class="text" x="1330" y="750"><tspan x="1330">Realtime output</tspan><tspan class="small" x="1330" dy="31">metrics and warnings</tspan></text>
+
+  <rect class="node output" x="1505" y="650" width="250" height="130" rx="18"/>
+  <text class="text" x="1630" y="690"><tspan x="1630">Offline evaluation</tspan><tspan class="small" x="1630" dy="31">frame level</tspan><tspan class="small" x="1630" dy="28">event level</tspan></text>
+
+  <rect class="node output" x="1505" y="850" width="250" height="105" rx="18"/>
+  <text class="text" x="1630" y="890"><tspan x="1630">Result CSV files</tspan><tspan class="small" x="1630" dy="31">aggregate / per subject</tspan></text>
+
+  <rect class="node output" x="1205" y="850" width="250" height="105" rx="18"/>
+  <text class="text" x="1330" y="890"><tspan x="1330">Report figures</tspan><tspan class="small" x="1330" dy="31">figures/</tspan></text>
+
+  <!-- Main flow edges -->
+  <path class="edge" d="M 290 142 H 325 V 340 H 355"/>
+  <path class="edge" d="M 290 322 H 355"/>
+  <path class="edge" d="M 290 502 H 325 V 395 H 355"/>
+  <path class="edge" d="M 585 368 H 650"/>
+  <path class="edge" d="M 910 368 H 910"/>
+  <path class="edge" d="M 1140 368 H 1175 V 132 H 1215"/>
+  <path class="edge" d="M 1140 368 H 1215 V 312"/>
+  <path class="edge" d="M 1140 368 H 1175 V 492 H 1215"/>
+  <path class="edge" d="M 1025 451 V 535"/>
+
+  <text class="label" x="1162" y="348">Yes</text>
+  <text class="label" x="1060" y="500">No</text>
+
+  <path class="edge" d="M 1450 132 H 1510"/>
+  <path class="edge" d="M 1450 312 H 1480 V 185 H 1510"/>
+  <path class="edge" d="M 1450 492 H 1480 V 220 H 1510"/>
+  <path class="edge" d="M 1450 132 H 1475 V 385 H 1510"/>
+  <path class="edge" d="M 1450 312 H 1510 V 430"/>
+  <path class="edge" d="M 1450 492 H 1510"/>
+
+  <path class="edge" d="M 1510 500 H 1475 V 762 H 1455"/>
+  <path class="edge" d="M 1755 167 H 1780 V 715 H 1755"/>
+  <path class="edge" d="M 1632 545 V 650"/>
+  <path class="edge" d="M 1630 780 V 850"/>
+  <path class="edge" d="M 1505 902 H 1455"/>
+
+  <!-- Annotation CSV feeds only offline evaluation -->
+  <path class="annotation-edge" d="M 290 757 H 1080 V 825 H 1480 V 715 H 1505"/>
+</svg>
