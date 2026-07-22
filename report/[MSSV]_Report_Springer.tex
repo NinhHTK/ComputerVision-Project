@@ -1,0 +1,466 @@
+% Springer LNCS draft for the CPV301 driver-drowsiness project.
+% Compile with the official llncs.cls and splncs04.bst supplied by Springer
+% or by the lecturer. Do not replace them with a locally emulated class.
+\documentclass[runningheads]{llncs}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+\emergencystretch=1em
+
+% Keeps the draft compilable while figures are being assembled. Every missing
+% figure box must be replaced by the real project image before submission.
+\newcommand{\projectfigure}[2][]{%
+  \IfFileExists{figures/#2}{%
+    \includegraphics[#1]{#2}%
+  }{%
+    \fbox{\parbox[c][35mm][c]{0.90\linewidth}{\centering
+      Missing project figure: \texttt{#2}}}%
+  }%
+}
+
+\title{An Explainable Real-Time Driver Drowsiness Detection System Using Facial Geometry and Temporal Rules}
+
+\titlerunning{Explainable Driver Drowsiness Detection}
+
+\author{Nguyen Bao Dang \and
+        Pham Vu Gia Kiet \and
+        Nguyen Xuan Binh\thanks{Corresponding author.} \and
+        Ha Thuc Khuong Ninh}
+
+\authorrunning{N. B. Dang et al.}
+
+% Confirm the official department and campus wording before submission.
+\institute{Department of Artificial Intelligence, FPT University,\\
+Ho Chi Minh City, Vietnam\\
+\email{ngxbinh9999@gmail.com}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Camera-based driver monitoring requires temporal reasoning because normal blinks,
+speech-related mouth opening, and brief head movements may resemble fatigue cues
+in individual frames. This paper presents an explainable academic prototype that
+combines pretrained MediaPipe Face Mesh landmarks with Eye Aspect Ratio (EAR),
+Mouth Aspect Ratio (MAR), eye-line roll, and duration rules expressed in seconds.
+The method was evaluated on 41,793 DDD images, 1,448 full-face yawn/no-yawn
+images, and six self-recorded videos from three participants. On usable static
+images, the DDD experiment achieved 0.8701 precision and 0.4673 recall, whereas
+yawn detection at MAR $>0.60$ achieved 1.0000 precision and 0.6551 recall. In
+video, event recall was 0.8000 for eye closure, 0.6000 for yawning, and 0.5000
+for lateral head tilt. Participant-specific results varied substantially because
+recording and annotation protocols were not standardized. The results show that
+second-based temporal tracking supports videos with different frame rates, but
+fixed thresholds, roll-only head geometry, and limited participant coverage
+prevent safety-critical deployment.
+
+\keywords{Driver drowsiness detection \and Facial landmarks \and Eye Aspect Ratio
+\and MediaPipe Face Mesh \and Temporal reasoning}
+\end{abstract}
+
+\section{Introduction}
+
+Driver drowsiness is a safety-relevant condition that cannot be inferred reliably
+from a single visual observation. A normal blink, a speech-related mouth opening,
+or a short head movement can resemble a fatigue cue in an isolated frame. Camera-
+based monitoring is nevertheless attractive for an academic prototype because it
+is contactless and can produce interpretable evidence from the eyes, mouth, and
+head \cite{sahayadhas2012review}.
+
+This work investigates a lightweight alternative to training a project-specific
+drowsiness classifier. MediaPipe Face Mesh provides pretrained facial landmarks,
+while project-defined geometric measurements and temporal rules determine the
+warning state. Measuring persistence in seconds rather than by a fixed number of
+frames is important because the submitted videos have different frame rates. The
+system is evaluated on public static images and continuous videos, with results
+reported at frame, event, aggregate, and participant levels.
+
+The practical contributions are: (i) integration of EAR, MAR, and lateral head
+roll in one real-time pipeline; (ii) duration tracking shared by webcam inference
+and offline evaluation; (iii) reproducible sample subsets for submission smoke
+tests; and (iv) explicit analysis of threshold trade-offs, participant variation,
+and failure cases. The system is an explainable course prototype rather than a
+certified vehicle-safety device.
+
+\section{Related Work}
+
+Driver-drowsiness monitoring methods are commonly grouped into physiological,
+vehicle-based, and behavioural approaches \cite{sahayadhas2012review}. Camera-based behavioural systems can measure several facial cues without wearable
+sensors. Sigari et al. combined eyelid, PERCLOS, and head-orientation information
+within a driver face-monitoring system \cite{sigari2013monitoring}. Their work
+supports multi-cue monitoring but also indicates that a single observable signal
+is not sufficient in all conditions.
+
+Soukupov\'a and \v{C}ech introduced the six-landmark EAR formulation for blink
+analysis \cite{soukupova2016ear}. Alioua et al. used mouth motion across
+consecutive frames for yawning-based fatigue detection \cite{alioua2014yawning}.
+Both approaches motivate the combination of interpretable facial geometry with
+temporal continuity rather than isolated frame decisions.
+
+MediaPipe provides a low-latency framework for perception pipelines
+\cite{lugaresi2019mediapipe}. Its monocular Face Mesh method estimates a dense
+facial surface with 468 landmarks \cite{kartynnik2019facemesh}, while Attention
+Mesh improves landmark quality in semantically important eye and lip regions
+\cite{grishchenko2020attention}. In the present project, these pretrained methods
+are used only for landmark extraction; the drowsiness decisions are produced by
+explicit ratios, an angle, and duration rules.
+
+Recent systems increasingly combine eye, mouth, and head information. Zhu et al.
+used facial video sequences with EAR, MAR, PERCLOS, and landmarks
+\cite{zhu2022fatigue}. Albadawi et al. supplied eye, mouth, and head-pose features
+to machine-learning classifiers \cite{albadawi2023visual}. Kim et al. combined
+landmark-based eye-closure detection with head-pose recognition and temporal
+continuity \cite{kim2023monitoring}. The present work does not propose a new
+landmark model or claim state-of-the-art performance. Its focus is transparent
+integration, second-based timing, and multi-level evaluation of a small academic
+prototype.
+
+\section{Proposed Method}
+
+\subsection{System Overview}
+
+\begin{figure}[t]
+\centering
+\projectfigure[width=0.98\linewidth]{system_pipeline.png}
+\caption{Pipeline from image, video, or webcam input through Face Mesh,
+geometric cues, temporal rules, real-time warning, and offline evaluation.}
+\label{fig:pipeline}
+\end{figure}
+
+Figure~\ref{fig:pipeline} summarizes the processing pipeline. Webcam frames,
+recorded videos, or static images are converted from BGR to RGB and processed by
+MediaPipe Face Mesh. If a face is found, the system computes EAR, MAR, and an
+eye-line roll angle. Static images use instantaneous geometric decisions. Webcam
+and video modes additionally require each condition to remain continuously true
+for its configured duration. A no-face frame is counted during evaluation and
+resets active temporal trackers.
+
+\subsection{Geometric Features}
+
+Six landmarks are used for each eye: left
+$\{33,160,158,133,153,144\}$ and right
+$\{362,385,387,263,373,380\}$. For eye points $p_1,\ldots,p_6$, EAR is
+
+\begin{equation}
+\mathrm{EAR}=\frac{\lVert p_2-p_6\rVert_2+\lVert p_3-p_5\rVert_2}
+{2\lVert p_1-p_4\rVert_2}.
+\label{eq:ear}
+\end{equation}
+
+The two eye values are averaged; a smaller EAR indicates greater closure. Mouth
+landmarks $\{78,308,13,14\}$ represent the corners and upper/lower lip centres:
+
+\begin{equation}
+\mathrm{MAR}=\frac{\lVert p_{\mathrm{upper}}-p_{\mathrm{lower}}\rVert_2}
+{\lVert p_{\mathrm{left}}-p_{\mathrm{right}}\rVert_2}.
+\label{eq:mar}
+\end{equation}
+
+A larger MAR indicates greater mouth opening. Outer eye corners 33 and 263 form
+the line used to estimate absolute roll:
+
+\begin{equation}
+\theta_{\mathrm{roll}}=
+\left|\frac{180}{\pi}\operatorname{atan2}(y_r-y_l,x_r-x_l)\right|.
+\label{eq:roll}
+\end{equation}
+
+This last cue represents lateral tilt. It does not estimate complete 3D head
+pose and can therefore miss forward nodding dominated by pitch.
+
+\subsection{Temporal Decision Rules}
+
+For recorded video, elapsed time increases by $1/\mathrm{FPS}$ for each frame;
+for a webcam, monotonic wall-clock time is used. An alert activates only after a
+condition remains continuously true for the required duration. The final shared
+configuration is shown in Table~\ref{tab:thresholds}.
+
+\begin{table}[t]
+\caption{Final geometric thresholds and minimum durations.}
+\label{tab:thresholds}
+\centering
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Cue & Condition & Duration & Intended behaviour \\
+\midrule
+Eye closure & EAR $<0.21$ & 1.000 s & Prolonged closure \\
+Yawn & MAR $>0.60$ & 0.500 s & Sustained mouth opening \\
+Head tilt & $|\theta_{\mathrm{roll}}|>15^{\circ}$ & 0.667 s & Lateral head lean \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MediaPipe Face Mesh is pretrained. The project does not train or fine-tune a new
+classifier; therefore optimizer, loss, learning rate, epoch count, and training
+augmentation do not apply to the final rule-based decision stage. The relevant
+configurable parameters are the geometric thresholds and temporal durations.
+
+\section{Experimental Setup}
+
+\subsection{Datasets and Submission Samples}
+
+The full Driver Drowsiness Dataset (DDD) contains 41,793 images: 22,348 drowsy
+and 19,445 non-drowsy images \cite{nasri_ddd}. Seventeen images had no detected
+face, leaving 41,776 usable samples. The full-face part of the yawn/no-yawn
+dataset contains 1,448 images \cite{raju_yawn}; two had no detected face,
+leaving 1,446 usable samples. Cropped eye-only images were excluded because Face
+Mesh requires a full face.
+
+To keep the submitted project reproducible and below the upload limit, the
+repository also contains a deterministic 300-image smoke-test subset: 50 images
+for each DDD class and 50 images for each yawn/no-yawn class in both the train
+and test splits. These samples verify installation and data traversal; the full-
+dataset results reported below were not computed from this reduced subset.
+
+\begin{figure}[t]
+\centering
+\projectfigure[width=0.96\linewidth]{sample_dataset_overview.png}
+\caption{Representative images from the submitted sample subsets. The figure
+illustrates DDD drowsy/non-drowsy and yawn/no-yawn variation; it is not an
+additional quantitative experiment.}
+\label{fig:samples}
+\end{figure}
+
+\subsection{Recorded Videos}
+
+Three participants each supplied an alert video and an acted-drowsiness video.
+The six videos contain 11,938 frames and 21 labeled events: 10 eye closures,
+five yawns, and six head tilts. Recording protocols were not standardized;
+frame rate, resolution, camera placement, performed behaviour, and annotation
+procedure differ across participants. Consequently, participant-specific
+results are treated as primary evidence and pooled results as supplementary
+summaries. The experiment has $N=3$ and cannot establish population-level
+generalization.
+
+\begin{table}[t]
+\caption{Submitted-video metadata and labeled events.}
+\label{tab:videos}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{@{}llrrrrrr@{}}
+\toprule
+Participant & Video & Frames & FPS & No-face & Eye & Yawn & Tilt \\
+\midrule
+\multirow{2}{*}{Binh} & Alert & 1,351 & 16.6 & 0 & 0 & 0 & 0 \\
+ & Drowsy & 1,421 & 16.6 & 21 & 5 & 3 & 3 \\
+\multirow{2}{*}{Kiet} & Alert & 2,287 & 29.9 & 0 & 0 & 0 & 0 \\
+ & Drowsy & 3,225 & 29.3 & 0 & 4 & 2 & 3 \\
+\multirow{2}{*}{Ninh} & Alert & 1,834 & 29.9 & 0 & 0 & 0 & 0 \\
+ & Drowsy & 1,820 & 29.9 & 0 & 1 & 0 & 0 \\
+\midrule
+Total & Six videos & 11,938 & -- & 21 & 10 & 5 & 6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ground truth is represented by event type, start time, and end time. Frame-level
+evaluation compares every prediction with the active labeled interval. An event
+alert is matched when it overlaps at least 30\% of a labeled interval. Each
+labeled interval can generate one hit; an unmatched label is a miss, and an
+unmatched alert is a false alarm.
+
+\subsection{Metrics and Implementation}
+
+Static and frame-level evaluation use accuracy, precision, recall, and F1-score.
+Event precision is $H/(H+F)$ and event recall is $H/(H+M)$, where $H$, $F$, and
+$M$ denote hits, false alarms, and misses. A metric is reported as not applicable
+when the required positive support is absent. Accuracy is interpreted together
+with precision, recall, F1, and event counts because negative video frames are
+the majority.
+
+The verified interpreter was Python 3.11.9. Package versions were OpenCV
+4.11.0, MediaPipe 0.10.21, NumPy 1.26.4, and Matplotlib 3.11.0. Shared
+configuration and temporal-logic modules are used by both real-time inference
+and evaluation programs.
+
+\section{Results and Discussion}
+
+\subsection{Static-Image Evaluation}
+
+Table~\ref{tab:static} reports the full-dataset results. DDD precision is high,
+but recall is 0.4673, so more than half of labeled drowsy images are missed. At
+MAR $>0.60$, no false positive occurs in yawn/no-yawn images, while 249 yawns
+are missed. Figure~\ref{fig:staticcm} shows that the main weakness in both tasks
+is false-negative detection rather than false positives.
+
+\begin{table}[t]
+\caption{Full public-image dataset results using the final configuration.}
+\label{tab:static}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.4pt}
+\begin{tabular}{@{}lrrrrrrrr@{}}
+\toprule
+Dataset & TP & TN & FP & FN & Acc. & Prec. & Recall & F1 \\
+\midrule
+DDD & 10,438 & 17,878 & 1,559 & 11,901 & .6778 & .8701 & .4673 & .6080 \\
+Yawn/no-yawn & 473 & 724 & 0 & 249 & .8278 & 1.0000 & .6551 & .7916 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\projectfigure[width=0.96\linewidth]{fig01_static_confusion_matrices.png}
+\caption{Row-normalized confusion matrices on the full processed DDD and
+yawn/no-yawn datasets. Images without a detected face are excluded from the
+matrices and reported separately.}
+\label{fig:staticcm}
+\end{figure}
+
+Lowering MAR from 0.60 to 0.45 increased yawn recall from 0.6551 to 0.8615 and
+F1 from 0.7916 to 0.9256 without a false positive on this static dataset.
+Nevertheless, 0.60 was retained as a conservative setting because static
+no-yawn images do not adequately represent speech, laughter, or other prolonged
+mouth movements that can occur in video.
+
+\subsection{EAR Configuration Analysis}
+
+Four EAR/duration settings were tested on one participant's development videos
+(Table~\ref{tab:ear}). All settings detected the five labeled eye-closure events.
+Configuration B reduced false alarms from 10 to six by increasing persistence
+from 0.67 to 1.00 s. Its frame F1 (0.6126) is slightly below the baseline
+(0.6274), so B is selected as a false-alarm/duration trade-off rather than an
+absolute optimum. Figure~\ref{fig:ear} visualizes both frame metrics and event
+errors. Because the comparison uses one participant, it is a sensitivity study,
+not evidence of general superiority.
+
+\begin{table}[t]
+\caption{EAR and duration configurations on the development participant.}
+\label{tab:ear}
+\centering
+\small
+\begin{tabular}{@{}lccrrrr@{}}
+\toprule
+Config. & EAR & Duration & Hits & False alarms & Recall & F1 \\
+\midrule
+Baseline & .21 & .67 s & 5/5 & 10 & .6578 & .6274 \\
+A & .18 & .67 s & 5/5 & 7 & .4702 & .5338 \\
+B (selected) & .21 & 1.00 s & 5/5 & 6 & .5916 & .6126 \\
+C & .19 & .83 s & 5/5 & 6 & .4834 & .5455 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\projectfigure[width=0.96\linewidth]{fig04_ear_configuration_comparison.png}
+\caption{Eye-closure frame metrics and event errors for four configurations.
+B* denotes the selected false-alarm/duration trade-off.}
+\label{fig:ear}
+\end{figure}
+
+\subsection{Video Results}
+
+Across all videos, the system detected eight of 10 eye closures, three of five
+yawns, and three of six head tilts (Table~\ref{tab:event}). Eye closure has the
+highest event recall but the lowest event precision because ten unmatched eye
+alerts were produced. Yawn detection is more conservative, while head-tilt
+precision and recall are both 0.50.
+
+\begin{table}[t]
+\caption{Supplementary pooled event-level video results.}
+\label{tab:event}
+\centering
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Event & GT & Hit & Miss & False alarm & Precision & Recall \\
+\midrule
+Eye closure & 10 & 8 & 2 & 10 & .4444 & .8000 \\
+Yawn & 5 & 3 & 2 & 1 & .7500 & .6000 \\
+Head tilt & 6 & 3 & 3 & 3 & .5000 & .5000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Participant-specific event metrics in Fig.~\ref{fig:subject} provide the more
+informative comparison. Binh achieved complete eye/yawn recall but no head-tilt
+hit; Kiet achieved complete head-tilt recall but detected only half of eye
+closures and none of the labeled yawns; Ninh contributed one detected eye event
+and had no positive yawn or tilt support. An N/A cell is unsupported or undefined
+and must not be interpreted as a zero score.
+
+\begin{figure}[t]
+\centering
+\projectfigure[width=0.92\linewidth]{fig06_video_event_metrics_per_subject.png}
+\caption{Primary event-level recall and precision by participant. Differences
+reflect both system behaviour and non-standardized recording/annotation
+protocols; N/A denotes an unsupported or undefined metric.}
+\label{fig:subject}
+\end{figure}
+
+Pooled frame-level F1 was 0.8398 for eye closure, 0.5118 for yawning, and 0.5507
+for head tilt. The corresponding recall values were 0.7936, 0.3453, and 0.3964.
+Accuracy exceeded 0.92 for every cue because negative frames dominate, so it
+does not by itself establish reliable warning performance.
+
+\subsection{Failure Cases}
+
+The quantitative results identify several failure modes. DDD recall of 0.4673
+shows that a fixed EAR threshold misses many labeled drowsy images. Eye closure
+produced ten event-level false alarms, which may be associated with squinting,
+landmark jitter, annotation timing, or a common threshold applied to different
+faces. MAR $=0.60$ reduces false positives but misses mouth openings that are
+not large or persistent enough. Roll-only geometry misses forward nodding when
+pitch changes without a large lateral eye-line angle. Finally, the Binh drowsy
+video contains 21 no-face frames (1.48\%); each loss resets temporal state and
+can fragment a genuine event.
+
+These explanations are hypotheses consistent with the measurements rather than
+controlled causal findings, because several recording factors changed at the
+same time. Before final submission, this subsection should include three to five
+authentic frames with video filename and timestamp: at least one eye false
+negative, one eye false alarm, one missed yawn, one forward-pitch miss, and one
+no-face example. No failure-case image should be staged or fabricated.
+
+\section{Limitations and Future Work}
+
+The video experiment contains only three participants and uses acted behaviours.
+FPS, resolution, camera placement, event performance, and annotation procedure
+were not standardized. Fixed thresholds may not transfer across facial geometry,
+eyewear, illumination, and camera viewpoints. Static image labels also do not
+represent the temporal context of a real warning. The method estimates roll but
+not full pitch/yaw, and loss of facial landmarks interrupts duration tracking.
+No learned baseline was evaluated under the same protocol.
+
+Future work should standardize capture and annotation, recruit more participants,
+separate development and test participants, calibrate neutral EAR/MAR baselines
+per user, estimate full 3D head pose, and include natural speech and laughter as
+negative yawn examples. With a larger participant sample, evaluation should
+report participant-level macro averages and uncertainty rather than relying on
+pooled frames.
+
+\section{Conclusion}
+
+This paper presented an explainable driver-drowsiness prototype using pretrained
+facial landmarks, EAR, MAR, head roll, and duration measured in seconds. The
+system supports webcam inference and offline evaluation without training a new
+drowsiness classifier. Static results showed high precision but limited recall,
+and video evaluation showed that eye closure was detected more reliably than
+yawning or lateral head tilt. Increasing eye persistence reduced false alarms on
+the development participant, but performance varied strongly across the three
+participants. The current evidence supports a reproducible academic prototype,
+not deployment as a safety-critical driver-monitoring system.
+
+% Add only verified statements before final submission, for example:
+% \section*{Acknowledgements}
+% \section*{Author Contributions}
+% \section*{Funding and Competing Interests}
+% Do not claim funding status, conflicts, ethics approval, or contribution roles
+% until every author has confirmed the wording.
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}
